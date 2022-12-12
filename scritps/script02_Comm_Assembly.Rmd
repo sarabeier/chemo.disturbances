@@ -18,8 +18,6 @@ addTaskCallback(function(...) {set.seed(1);TRUE})
 # Load packages and formatting
 ## Loading packages
 ```{r setup, include=T,message=F,warning=F}
-
-#SARA: make sure that only necessary libraries are loaded; simplify path info; make code to create Figure visible in pdfs
 rm(list=ls())
 library(phyloseq)
 library(ggplot2)
@@ -27,7 +25,6 @@ library(vegan)
 library(ecodist)
 library(dplyr) 
 library(ape) #
-library(pairwiseAdonis) #Pairwise adonis? #SARA: I think this is not needed, I can't load it but don't get errors
 library(iCAMP) #NULL model for microbial comm
 library(cowplot) #Multiple panel formatting
 library(egg) #Additional label for multiple panels
@@ -62,11 +59,11 @@ tibble(schema)
 
 ```{r}
 #Loading phyloseq object from #dada2
-ps <- readRDS("../data.all/dada.out4/chem.ps.rds")
+ps <- readRDS("../data/dada2.output/chem.ps.rds")
 #Phyloseq object contain abundance table, sample information, taxanomic information and the phylogenetic tree
 
 # Loadgin phylogenetic tree
-chem.tree=read_tree("../data.all/dada.out4/dada-chem.GTR2")
+chem.tree=read_tree("../data/dada2.output/dada-chem.GTR2")
 phy_tree(ps)<-chem.tree #Adding phylo-tree to the phyloseq object
 
 #Phyloseq object contain abundance table, sample information, taxonomic information and the phylogenetic tree
@@ -279,7 +276,7 @@ plot.NTI.HDOM
 
 ## Export figure
 ```{r}
-pdf("../figures/FigureS3m_betaNTI.pdf", width=7,height=5)
+pdf("../figures/FigureS3_betaNTI.pdf", width=7,height=5)
 plot_grid(plot.NTI.LDOM,plot.NTI.HDOM,ncol=1,labels=c("LDOM","HDOM"),
           label_x =0.07,label_y = 0.97,label_size = 12)
 dev.off()
