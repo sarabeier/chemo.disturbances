@@ -41,10 +41,10 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2"
 ## # Abundance and salinity
 
 ```{r}
-Dat=data.frame(read_xls("../data.all/Comm_functioning/MA10v3.xls",sheet="Chemo summary"))
+Dat=data.frame(read_xls("../data/comm.rates/Chemo10.data.MicrobialAbundance.xls",sheet="Chemo summary"))
 Dat=Dat[Dat$Time<42,] #Only keep the samples until one day 41 for figure
 DatS=Dat #Dataframe only for Salinity figure
-Dat=Dat[,c(3,8,9,10:13,22)] #Removing unused columns
+#Dat=Dat[,c(3,8,9,10:13,22)] #Removing unused columns
 Dat=Dat[complete.cases(Dat),] #Removing unused columns
 Dat$DOM=as.factor(Dat$DOM)
 levels(Dat$DOM)= c("HDOM","LDOM")
@@ -120,7 +120,7 @@ Abundance_plot=Dat%>%
   #scale_colour_grey()+
   scale_colour_manual(values=cbbPalette,name="Disturbance")+
  scale_shape_manual(values=c(21, 4),name="DOM level",labels=c("HDOM","LDOM"))+
-  labs(tag = "D")+scale_x_continuous(breaks = c(1:41),expand=c(0.01,0.01))+
+  labs(tag = "D")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
   xlab("Time (days)")+ylab(expression("BA (x10"^6*"cell mL"^-1*")"))+
   geom_smooth(aes(colour=Treatment),method="loess",se=F,span=0.3)+
   geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
@@ -135,7 +135,7 @@ Abundance_plot=Abundance_plot+theme(legend.position="none")
 # Loading datasets Community functioning
 Dataset includes microbial community respiration and bacterial production
 ```{r}
-df.comm.funct<-data.frame(read_csv("../data.all/Comm_functioning/functional.response.csv"))
+df.comm.funct<-data.frame(read_csv("../data/comm.rates/functional.response.csv"))
 tibble(df.comm.funct)
 ```
 
@@ -148,7 +148,7 @@ tibble(df.comm.funct)
 Ratio=0.89 #Coefficient to transform O2 consumption to CO2 (Williams and del Giorgio, 2005)
 BGE=df.comm.funct[1:144,1:5] #Get metadata to store BGE
 BGE$Value= (df.comm.funct$Value[df.comm.funct$Variable=="Bacterial.production"]/12)/
-  ((df.comm.funct$Value[df.comm.funct$Variable=="Bacterial.production"]/12)+(df.comm.funct$Value[df.comm.funct$Variable=="Respiration"]*Ratio*24))
+  ((df.comm.funct$Value[df.comm.funct$Variable=="Bacterial.production"]/12)+(df.comm.funct$Value[df.comm.funct$Variable=="Community.Respiration"]*Ratio*24))
 
 BGE$Variable="BGE"
 kbl(head(BGE))%>%
@@ -168,7 +168,7 @@ my_theme=theme_bw()+
 ```
 ```{r fig.dim = c(10, 12),warning=F,message=F,results=F, echo=F}
 
-plot1=df.comm.funct[df.comm.funct$Variable=="Respiration",]%>%
+plot1=df.comm.funct[df.comm.funct$Variable=="Community.Respiration",]%>%
   ggplot(aes(x =interaction(factor(Week)), y =Value,colour=(Comment)))+
   geom_boxplot(aes(colour=(Comment)),position=position_dodge(0),outlier.size = -1,alpha=0.3)+
   facet_wrap(~DOM*Treatment,ncol=4)+
@@ -209,7 +209,7 @@ Here we defined calculation step by step for the resistance index for all the fu
 
 #Set up levels as factors
 df.comm.funct$Variable=factor(df.comm.funct$Variable)
-df.comm.funct$Variable=factor(df.comm.funct$Variable,c("Bacterial.production","Respiration","BGE"))
+df.comm.funct$Variable=factor(df.comm.funct$Variable,c("Bacterial.production","Community.Respiration","BGE"))
 # Empty list for storing results
 List.ratio=list()
 for (i in 1:3){
