@@ -1,0 +1,305 @@
+---
+title: "Chemo.02.ComunityAssembly"
+author: "Angel Rain & Sara Beier"
+date: "8/1/2022"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+  word_document:
+    toc: yes
+---
+```{r, include=F,message=F}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=75),tidy=TRUE)
+addTaskCallback(function(...) {set.seed(1);TRUE})
+```
+
+# Load packages and formatting
+## Loading packages
+```{r setup, include=T,message=F,warning=F}
+
+#SARA: make sure that only necessary libraries are loaded; simplify path info; make code to create Figure visible in pdfs
+rm(list=ls())
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(ecodist)
+library(dplyr) 
+library(ape) #
+library(pairwiseAdonis) #Pairwise adonis? #SARA: I think this is not needed, I can't load it but don't get errors
+library(iCAMP) #NULL model for microbial comm
+library(cowplot) #Multiple panel formatting
+library(egg) #Additional label for multiple panels
+library(reshape) #Dataframe formatting
+library(stringr) #Text manipulation
+library(microViz) #Microbiome (re_order function for phyloseq-objects)
+library(rstatix) #Versatile statistical package
+
+```
+
+## Setting colorblind palette
+
+```{r}
+#Colorblind palette
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00","#CC79A7","#808080","#7570B3")
+```
+
+## Loading and formating datasets
+In this section the object schema with information about the experimental setup (Sample.ID; Chemostat.ID: chemostat number from 1 to 12; sampling time T: 1:9, DOM: DOM regime; Sal: disturbance regime) is created. 
+Metabracoding sequence data (16s rRNA gene) were analyzed using the dada2-pipeline (Callahan et al. 2016,  doi: 10.1038/nmeth.3869) using the code detailed in [https://github.com/angelrainf/gesifus.cryo.dada2](https://github.com/angelrainf/gesifus.cryo.dada2) and the resulting phyloseq project containing the ASV count table is uploaded.
+
+```{r}
+# Create metadata for experimental setup
+schema<-data.frame(sample.ID=paste0("C10-",rep(1:9,each=12),"-",sprintf("%02d",1:12)),
+                   T=rep(1:9,each=12),
+                   Chem.ID=sprintf("%02d",1:12),
+                   DOM=rep(c("L","H"),each=6),
+                   Sal=c("C","D"))
+
+tibble(schema)
+```
+
+```{r}
+#Loading phyloseq object from #dada2
+ps <- readRDS("../data.all/dada.out4/chem.ps.rds")
+#Phyloseq object contain abundance table, sample information, taxanomic information and the phylogenetic tree
+
+# Loadgin phylogenetic tree
+chem.tree=read_tree("../data.all/dada.out4/dada-chem.GTR2")
+phy_tree(ps)<-chem.tree #Adding phylo-tree to the phyloseq object
+
+#Phyloseq object contain abundance table, sample information, taxonomic information and the phylogenetic tree
+ps 
+```
+
+# Microbial community dynamic
+## Preprocess phyloseq-object
+```{r}
+#Rarefy by minimum readnumber and transform to relative data
+ps=rarefy_even_depth(ps, min(rowSums(otu_table(ps))),rngseed=1,replace=F,trimOTUs=F)
+
+#Estimating relative abundance
+rOTUdf.rar <- prop.table(otu_table(ps),1)
+
+#Estimating relative abundance
+rOTUdf.rar <- prop.table(otu_table(ps),1)
+
+# New phyloseq-project with rarefied ASV table
+otu_table(ps) <- otu_table(rOTUdf.rar, taxa_are_rows=FALSE) 
+ps 
+
+# Keep ASVs with prevalence equivalent to more 0 reads
+ps<-prune_taxa(taxa_sums(ps)>0,ps) 
+ps
+# Setting up metadata
+head(sample_data(ps)) 
+# Some samples in phyloseq object are not included into this analyses (schema), so we proceed to reorder ps-data base in the schema$sample.ID
+
+# Re-Order ps object by sample ID from schema-object
+new_order <- schema$sample.ID
+ps=ps %>%
+  ps_reorder(new_order) #MicroViz package
+
+#Vizualize ordered ps-object
+head(sample_data(ps))
+tail(sample_data(ps))
+```
+
+## Subset data by treatment
+```{r}
+# Create empty list-objects
+LD.ps=list() # List to store LDOM results
+LC.ps=list() # List to store LDOM results
+
+HD.ps=list() # List to store HDOM results
+HC.ps=list() # List to store HDOM results
+
+# Sample ID (Control and disturbance treatments)
+LDOM_C=c("01","03","05") #L-DOM Samples for control
+LDOM_D=c("02","04",'06') #L-DOM Samples for disturbed treatments
+HDOM_C=c("07","09","11") #H-DOM Samples for control
+HDOM_D=c("08","10","12") #H-DOM Samples for disturbed treatments
+```
+
+```{r}
+#LDOM level
+## Filter by Sample
+tmpL<-prune_samples(ps@sam_data[["Chem.ID"]]%in%LDOM_C,ps)
+#Filter ASVs (taxa) to only those with abun  equal to 0 in all the samples
+LC.ps <- filter_taxa(tmpL, function(x) sum(x!=0) >0, TRUE)
+LC.ps
+
+tmpL<-prune_samples(ps@sam_data[["Chem.ID"]]%in%LDOM_D,ps)
+LD.ps <-  filter_taxa(tmpL, function(x) sum(x!=0) >0, TRUE)
+LD.ps
+
+#HDOM level
+## Filter by Sample
+tmpH<-prune_samples(ps@sam_data[["Chem.ID"]]%in%HDOM_C,ps)
+#Filter ASVs (taxa) to only those with abun  equal to 0 in all the samples
+HC.ps <-  filter_taxa(tmpH, function(x) sum(x!=0) >0, TRUE)
+HC.ps
+
+tmpH<-prune_samples(ps@sam_data[["Chem.ID"]]%in%HDOM_D,ps)
+#Filter ASVs (taxa) to only those with abun  equal to 0 in all the samples
+HD.ps <-  filter_taxa(tmpH, function(x) sum(x!=0) >0, TRUE)
+HD.ps
+```
+
+## Compute the beta-Nearest Taxon Index (bNTI)
+The Influence of deterministic versus stochastic processes on microbial community dynamics was quantified during the course of the continuous culture experiment via null model analyses using the beta nearest taxon indices (bNTI) between sample pairs. For this purpose we applied bNTIs between two temporally succeeding samples separately for disturbance and DOM regimes by applying a sliding window setup in the continuous cultures.
+```{r}
+knitr::opts_chunk$set(cache = T)
+
+NTI.out.LC=list() #Loop for LDOM for each sampling point
+NTI.out.LD=list() #Loop for LDOM for each sampling point
+
+# L-DOM x Control
+  comm=otu_table(LC.ps)
+  dist=cophenetic(phy_tree(LC.ps)) #Standard distance calculation for tree used in the manual
+  NTI.out.LC=bNTIn.p(comm@.Data, dist, nworker = 2, memo.size.GB = 50,
+                          weighted = TRUE, exclude.consp = FALSE, rand =1000,
+                          output.bMNTD = FALSE, sig.index = "SES", unit.sum = NULL,
+                          correct.special = FALSE, detail.null = FALSE,
+                          special.method = "MNTD")
+
+# L-DOM x Disturbance
+  comm=otu_table(LD.ps)
+  dist=cophenetic(phy_tree(LD.ps)) #Standard distance calculation for tree used in the manual
+  NTI.out.LD=bNTIn.p(comm@.Data, dist, nworker = 2, memo.size.GB = 50,
+                     weighted = TRUE, exclude.consp = FALSE, rand =1000,
+                     output.bMNTD = FALSE, sig.index = "SES", unit.sum = NULL,
+                     correct.special = FALSE, detail.null = FALSE,
+                     special.method = "MNTD")
+
+NTI.out.HC=list() #Loop for HDOM for each sampling point
+NTI.out.HD=list() #Loop for LDOM for each sampling point
+
+# H-DOM x Control
+  comm=otu_table(HC.ps)
+  dist=cophenetic(phy_tree(HC.ps)) #Standard distance calculation for tree used in the manual
+  NTI.out.HC=bNTIn.p(comm@.Data, dist, nworker = 2, memo.size.GB = 50,
+                     weighted = TRUE, exclude.consp = FALSE, rand =100,
+                     output.bMNTD = FALSE, sig.index = "SES", unit.sum = NULL,
+                     correct.special = FALSE, detail.null = FALSE,
+                     special.method = "MNTD")
+
+# H-DOM x Disturbance
+  comm=otu_table(HD.ps)
+  dist=cophenetic(phy_tree(HD.ps)) #Standard distance calculation for tree used in the manual
+  NTI.out.HD=bNTIn.p(comm@.Data, dist, nworker = 2, memo.size.GB = 50,
+                     weighted = TRUE, exclude.consp = FALSE, rand =100,
+                     output.bMNTD = FALSE, sig.index = "SES", unit.sum = NULL,
+                     correct.special = FALSE, detail.null = FALSE,
+                     special.method = "MNTD")
+```
+
+## Reshape bNTI index into a data.frame
+```{r}
+#Function to transform distance matrix into dataframe
+  dist2df_AR<-function(m){
+    xy <- t(combn(colnames(m$index), 2))
+    tmp=data.frame(xy, dist=m$index[xy])
+    tmp$t1=str_split_fixed(as.character(tmp$X1),"-",3)[,2] # Extract the time point from sample "x"
+    tmp$t2=str_split_fixed(as.character(tmp$X2),"-",3)[,2] # Extract time point from sample "y"
+    tmp$dif=as.numeric(tmp$t2)-as.numeric(tmp$t1) # Calculate the difference in time units
+    return(tmp)
+  }
+    
+# LDOM control regime
+df.NTI.LC<-dist2df_AR(NTI.out.LC)
+df.NTI.LC=df.NTI.LC[df.NTI.LC$dif==1,] # Get data space by only 1 time unit
+df.NTI.LC$DOM="LDOM"
+df.NTI.LC$Treatment="Control"
+tibble(df.NTI.LC)
+
+#LDOM disturbance regime
+
+df.NTI.LD<-dist2df_AR(NTI.out.LD)
+df.NTI.LD=df.NTI.LD[df.NTI.LD$dif==1,]# Get data space by only 1 time unit
+df.NTI.LD$DOM="LDOM"
+df.NTI.LD$Treatment="Disturbance"
+tibble(df.NTI.LD)
+
+#HDOM control regime
+df.NTI.HC<-dist2df_AR(NTI.out.HC)
+df.NTI.HC=df.NTI.HC[df.NTI.HC$dif==1,]# Get data space by only 1 time unit
+df.NTI.HC$DOM="HDOM"
+df.NTI.HC$Treatment="Control"
+tibble(df.NTI.HC)
+#HDOM disturbance regime
+df.NTI.HD<-dist2df_AR(NTI.out.HD)
+df.NTI.HD=df.NTI.HD[df.NTI.HD$dif==1,]# Get data space by only 1 time unit
+df.NTI.HD$DOM="HDOM"
+df.NTI.HD$Treatment="Disturbance"
+tibble(df.NTI.HD)
+
+# Pooling the dataframes together
+df.NTI.all=rbind(df.NTI.LC,df.NTI.LD,df.NTI.HC,df.NTI.HD)
+tibble(df.NTI.all)
+```
+
+## Plot boxplot bNTI per DOM regime
+The bNTI evaluates whether the phylogenetic similarity between a pair of sample is significantly lower or higher than expected by chance relative to a reference species pool. Phylogenetic similarity surpassing the theoretical expectation (bNTI >2) indicates the prevalence of variable deterministic assembly processes during community succession. Phylogenetic similarity below the theoretical  expectation (bNTI< -2), indicates the prevalence of homogeneous deterministic assembly processes during community succession. bNTIs between -2 and 2 indicate that community assembly is driven by stochastic rather than a deterministic processes.
+
+
+```{r}
+#LDOM
+plot.NTI.LDOM=df.NTI.all[df.NTI.all$DOM=="LDOM",]%>%
+  ggplot(aes((t2),dist,colour=(Treatment)))+
+  geom_boxplot(outlier.size =-1,alpha=0.5,size=0.5)+
+  geom_jitter(aes(group=interaction(t2,Treatment)),position=position_dodge(0.8),alpha=0.5,size=0.8)+
+  ylab(" bNTI ")+xlab("Exp. Time")+
+  scale_color_manual(values=cbbPalette,name="")+
+  theme_bw()+ylim(-6,6)+
+  geom_hline(aes(yintercept=-2),color="grey", linetype="dashed", size=.5)+
+  geom_hline(aes(yintercept=2),color="grey", linetype="dashed", size=.5)+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_x_discrete(labels=c("2" = "T1-T2", "3" = "T2-T3","4" = "T3-T4","5" = "T4-T5",
+                            "6" = "T5-T6","7" = "T6-T7","8" = "T7-T8","9" = "T8-T9"))
+plot.NTI.LDOM
+#HDOM
+plot.NTI.HDOM=df.NTI.all[df.NTI.all$DOM=="HDOM",]%>%
+  ggplot(aes((t2),dist,colour=(Treatment)))+
+  geom_boxplot(outlier.size =-1,alpha=0.5,size=0.5)+
+  geom_jitter(aes(group=interaction(t2,Treatment)),position=position_dodge(0.8),alpha=0.5,size=0.8)+
+  ylab("bNTI ")+xlab("Exp. Time")+
+  scale_color_manual(values=cbbPalette,name="")+
+  theme_bw()+ylim(-6,6)+
+  geom_hline(aes(yintercept=-2),color="grey", linetype="dashed", size=.5)+
+geom_hline(aes(yintercept=2),color="grey", linetype="dashed", size=.5)+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_x_discrete(labels=c("2" = "T1-T2", "3" = "T2-T3","4" = "T3-T4","5" = "T4-T5",
+                            "6" = "T5-T6","7" = "T6-T7","8" = "T7-T8","9" = "T8-T9"))
+
+plot.NTI.HDOM
+
+```
+
+## Export figure
+```{r}
+pdf("../figures/FigureS3m_betaNTI.pdf", width=7,height=5)
+plot_grid(plot.NTI.LDOM,plot.NTI.HDOM,ncol=1,labels=c("LDOM","HDOM"),
+          label_x =0.07,label_y = 0.97,label_size = 12)
+dev.off()
+```
+
+## Statistical analysis
+```{r}
+df.NTI.all$Rep=rep(c(1,2,3),each=3)
+df.NTI.all$t2=as.numeric(df.NTI.all$t2)
+# Testing assumptions
+#Normality
+df.NTI.all %>%
+  group_by(DOM,Treatment,t2) %>%
+  shapiro_test(dist)
+
+#Homogeneity of variances
+df.NTI.all%>%
+  group_by(t2) %>%
+  levene_test(dist~DOM*Treatment)
+
+#Repeated measurement ANOVA
+summary(aov(dist ~DOM*Treatment*t2 + Error(Rep),data=df.NTI.all))
+```
