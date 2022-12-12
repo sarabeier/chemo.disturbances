@@ -28,8 +28,6 @@ library(car)
 library(rstatix)
 library(olsrr)
 library(egg)
-#library(geiger)
-#library(fANCOVA)
 library(nlme)
 library(mgcv)
 library(rstatix) #Tibble function
@@ -57,38 +55,33 @@ tibble(schema)
 #Loading phyloseq object with ASV count table from #dada2
 ```{r}
 #Loading phyloseq object from #dada2
-ps <- readRDS("../data.all/dada.out4/chem.ps.rds")
+ps <- readRDS("../data/dada2.output/chem.ps.rds")
 #Phyloseq object contain abundance table, sample information, taxanomic information and the phylogenetic tree
 
 # Loadgin phylogenetic tree
-chem.tree=read_tree("../data.all/dada.out4/dada-chem.GTR2")
+chem.tree=read_tree("../data/dada2.output/dada-chem.GTR2")
 phy_tree(ps)<-chem.tree #Adding phylo-tree to the phyloseq object
 
 #Phyloseq object contain abundance table, sample information, taxonomic information and the phylogenetic tree
 ps 
 ```
 
-# Load predicted traits for data re-transformation
-```{r}
-pic.traits <- read.table("../data.all/picrust.traits/trait.files.new/pic.traits_trans.tab", header=T, sep ='\t')
-tibble(pic.traits)
-```
 ## Load predicted traits
 ```{r}
 #Resilience related genes
 #load RRN predicted from rrnDB tree and trait data
-pic.16s.custom <- read.table("../data.all/picrust.traits/predicted.new/pic.chemo10.16S_predicted_custom_tree.txt", header=T) #SARA: please simplify path, everything in a folder ../PICRUSt2 should be fine
+pic.16s.custom <- read.table("../data/picrust2/trait.predicted/pic.chemo10.16S_predicted_custom_tree.txt", header=T) 
 tibble(pic.16s.custom)
-#load generation time predicted from PICRUSt2 default tree and database
-pic.d.gRodon.default <- read.table("../data.all/picrust.traits/predicted.new/p.d.gRodon.scaled.txt", header=T)  
+#load generation time predicted from PICRUST2 default tree and database
+pic.d.gRodon.default <- read.table("../data/picrust2/trait.predicted/p.d.gRodon.scaled.txt", header=T)  
 tibble(pic.d.gRodon.default)
 
 #Resistance-related genes
 #load %TF predicted from PICRUSt2 default tree and database
-pic.TFr.default <- read.table("../data.all/picrust.traits/predicted.new/p.TF_perc.scaled.txt", header=T)
+pic.TFr.default <- read.table("../data/picrust2/trait.predicted/p.TF_perc.scaled.txt", header=T)
 tibble(pic.TFr.default)
 #load genome size predicted from PICRUSt2 default tree and database
-pic.gs.default <- read.table("../data.all/picrust.traits/predicted.new/p.genome.size.scaled.txt", header=T)
+pic.gs.default <- read.table("../data/picrust2/trait.predicted/p.genome.size.scaled.txt", header=T)
 tibble(pic.gs.default)
 
 ```
@@ -127,7 +120,6 @@ counts=t(otu_table(ps))
 
 ### Remove ASVs without close relatives in the default reference database (NSTI<1)
 ```{r}
-#SARA: we do not need the 16s default data(they are not needed anywhere else), we can simply use each of the predicted traits from the default reference set
 counts.s.default <- counts[row.names(counts) %in% pic.gs.default[pic.gs.default$metadata_NSTI<1,1], ] #extract ASVs with NSTI<1 in default reference database
 colSums (counts.s.default) #check which proportion of sequences is left after removing ASVs with NSTI<1
 min(colSums (counts.s.default))
@@ -324,11 +316,10 @@ res.ttest.df$HDOM.pvalue[i]=res.ttest[[i]]$p.value
 
 tibble(res.ttest.df)
 ```
-## Figure XX (#SARA: display final Figure nr)
+## Manuscript Figure 3
 ```{r, fig.dim=c(5.5,6)}
-# Edit the title figures with Pvalues #SARA: ? Could you add the trait inside the panel behind the title (this will save space)
 # New facet label names for dose variable
-bxp_labs <-c("" ,"hrs","%"," Mbp","")
+bxp_labs <-c("" ,"",""," ","")
 names(bxp_labs) <- levels(traits.w$variable)
 traits.w$DOM=factor(traits.w$DOM,levels=c("L","H"))
 
@@ -354,7 +345,7 @@ bxp=traits.w%>%
 
 #Labels using facet_tag
 bxp=tag_facet(bxp,open = "", close = "",
-              tag_pool=c(" A) RNN", " B) RNN "," C) d"," D) d"," E) TF"," F) TF"," G) Genome Size", " H) Genome Size"," I) Shannon"," J) Shannon"),x=0, fontface = 1,size=3,hjust=0)
+              tag_pool=c(" A) RNN", " B) RNN "," C) d (hrs)"," D) d (hrs)"," E) TF (%)"," F) TF (%)"," G) Genome Size (Mbp)", " H) Genome Size (Mbp)"," I) Shannon"," J) Shannon"),x=0, fontface = 1,size=3,hjust=0)
 bxp=bxp+theme(plot.margin=margin(t = 20, r = 5, b = 5, l = 5, unit = "pt"))
 bxp
 
