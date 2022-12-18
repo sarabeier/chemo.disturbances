@@ -1,0 +1,343 @@
+---
+title: "Chemo.06.ResistanceIndex"
+author: "Angel Rain-Franco"
+date: "12/1/2021"
+output:
+  pdf_document: 
+    number_sections: yes
+    toc: yes
+  word_document: default
+  html_document: default
+---
+```{r, include=F,message=F}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=75),tidy=TRUE)
+```
+
+#Load packages
+```{r setup, include=T,message=F,warning=F}
+rm(list=ls())
+library(readxl) # read excel files
+library(dplyr) 
+library(ggplot2) #Plots
+#library(Hmisc) #
+library(tidyverse)
+#library(ggpubr)
+library(rstatix)
+#library(emmeans)
+library(cowplot) #Arrange plots
+library(egg) #Tag in figures
+library(olsrr) #Normality test (kolmogorov-smirnov)
+library(kableExtra) #Export regular tables
+library(nlme) #Mixed linear models
+library(lmerTest) #P values mixed linear models
+#Color palette
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+```
+
+# Load complementary data
+## Abundance and salinity
+
+```{r,fig.align = 'center', fig.width = 6,fig.height = 3}
+Dat=data.frame(read_xls("../data/comm.rates/MicrobialAbundance.xls",sheet="Chemo summary"))
+Dat=Dat[Dat$Time<42,] #Only keep the samples until one day 41 for figure
+DatS=Dat #Dataframe only for Salinity figure
+Dat=Dat[complete.cases(Dat),] #Removing unused columns
+Dat$DOM=as.factor(Dat$DOM)
+levels(Dat$DOM)= c("HDOM","LDOM")
+Dat$id=paste0(Dat$Time ,".",Dat$DOM,".",Dat$Treatment,".",Dat$Replicate)
+Dat$id=as.factor(Dat$id)
+
+# Creating the salinity changes and DNA frequency sampling for Figure1 ms chemostats
+# DNA sampling frequency plot
+pDNA=ggplot()+#
+  geom_segment(aes(x=c(4,8,15,18,22,29,36,39,41),y=rep(2,9), xend = c(4,8,15,18,22,29,36,39,41), yend = rep(0,9)),
+               arrow = arrow(length = unit(0.2, "cm")),size=.5)+labs(y="DNA Sampling",x="")+
+  annotate("text", x=c(4,8,15,18,22,29,36,39,41)-1, y = rep(1.5,9),
+           label=c("T1","T2","T3","T4","T5","T6","T7","T8","T9"),size=3)+
+  scale_x_continuous(breaks = c(1:41),expand=c(0.01,0.01),limits = c(1,41))+
+  theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major =element_blank(),
+                   axis.text.x = element_blank(),axis.text.y =element_blank())+
+  theme(text=element_text(size=10, family="ArialMT"))+
+  labs(tag = "")+theme(axis.ticks.y=element_blank(),axis.ticks.x=element_blank(),panel.border = element_blank())+
+  theme(plot.margin=margin(t = -5, r = 5, b = -10, l = 0, unit = "pt"))+
+  theme(axis.title.y = element_text(angle = 0, vjust = 0.5))
+
+# Salinity time series figure (control vs disturbance)
+
+Salinity_plot=DatS%>%
+  ggplot()+geom_point(aes(Time,Salinity,colour=Treatment,shape=DOM))+
+  stat_summary(aes(Time,Salinity,colour=Treatment,linetype=DOM),fun= mean,geom = "line")+
+  geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
+  scale_color_manual(values=cbbPalette,name="")+
+  xlab("")+ylab("Salinity")+ylim(35,60)+
+  labs(tag = "")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
+  theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank(),legend.position = "none",
+                   axis.text.x = element_text(size=6),axis.text.y = element_text(size=8))+
+  theme(text=element_text(family="ArialMT"))+
+  theme(plot.margin=margin(t = -15, r = 5, b = 0, l = 0, unit = "pt"))+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+
+pdf("../figures/Figure_Salinity.pdf", width=7,height=4)
+plot_grid(pDNA,Salinity_plot,
+          ncol = 1,axis="l", rel_heights =c(0.1,0.5), hjust=-4, align="v")
+dev.off()
+plot_grid(pDNA,Salinity_plot,
+          ncol = 1,axis="l", rel_heights =c(0.1,0.5), hjust=-4, align="v")
+
+```
+## Bacterial abundance time series
+```{r}
+# Bacterial abundance time series
+Abundance_plot=Dat%>%
+  ggplot(aes(x =Time, y =Bact/1000000,group=interaction(Treatment,DOM))) +
+  geom_point(aes(colour=Treatment,shape=DOM),size=1)+
+  scale_colour_manual(values=cbbPalette,name="Disturbance")+
+  scale_shape_manual(values=c(21, 4),name="DOM level",labels=c("HDOM","LDOM"))+
+  labs(tag = "D")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
+  xlab("Time (days)")+ylab(expression("BA (x10"^6*"cell mL"^-1*")"))+
+  geom_smooth(aes(colour=Treatment),method="loess",se=F,span=0.3)+
+  geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
+  theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank(),legend.position = "bottom", legend.box="vertical",legend.margin=margin(),legend.spacing.y = unit(0, 'cm'), axis.text.x = element_text(size=10),axis.text.y = element_text(size=8))+
+  theme(text=element_text(family="ArialMT"))+
+  theme(plot.margin=margin(t =0, r = 5, b = 2, l = 0, unit = "pt"))+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+legend_plot=get_legend(Abundance_plot)
+Abundance_plot=Abundance_plot+theme(legend.position="none")
+```
+
+# Loading datasets Community functioning
+Dataset includes microbial community respiration and bacterial production
+```{r}
+df.comm.funct<-data.frame(read_csv("../data/comm.rates/Functional.response.csv"))
+tibble(df.comm.funct)
+```
+
+### Bacterial growth efficiency  (BGE) calculation 
+
+```{r}
+# RES2= Bulk respiration (uM_h_corr or umol L-1 h-1) need to be scaled to daily rate
+# RES3= Bulk production (ugC L-1 d-1) need to be transformed to molar by the molecular weigth of Carbon
+
+Ratio=0.89 #Coefficient to transform O2 consumption to CO2 (Williams and del Giorgio, 2005)
+BGE=df.comm.funct[1:144,1:5] #Get metadata to store BGE
+BGE$Value= (df.comm.funct$Value[df.comm.funct$Variable=="Bacterial.production"]/12)/
+  ((df.comm.funct$Value[df.comm.funct$Variable=="Bacterial.production"]/12)+(df.comm.funct$Value[df.comm.funct$Variable=="Community.Respiration"]*Ratio*24))
+
+BGE$Units="Percentage"
+BGE$Variable="BGE"
+kbl(head(BGE))%>%
+  kable_styling()
+
+# Combining datasets
+df.comm.funct=rbind(df.comm.funct,BGE)
+```
+
+## Functional rates
+Figures 
+```{r }
+#setting up graphic setting for the figures
+my_theme=theme_bw()+
+  theme(text=element_text(size=14, family="ArialMT"))+
+  theme(legend.position="none",panel.grid.minor = element_blank(),panel.grid.major = element_blank(),axis.text.x = element_text(size=6),axis.text.y = element_text(size=8))
+```
+```{r fig.dim = c(10, 12),warning=F,message=F,results=F, echo=F}
+
+plot1=df.comm.funct[df.comm.funct$Variable=="Community.Respiration",]%>%
+  ggplot(aes(x =interaction(factor(Week)), y =Value,colour=(Comment)))+
+  geom_boxplot(aes(colour=(Comment)),position=position_dodge(0),outlier.size = -1,alpha=0.3)+
+  facet_wrap(~DOM*Treatment,ncol=4)+
+  labs(y=expression("Respiration (O2 umol L"^-1*"h"^-1*")"),x="")+ geom_jitter(position=position_dodge(0))+my_theme
+
+
+plot2=df.comm.funct[df.comm.funct$Variable=="Bacterial.production",]%>%
+  ggplot(aes(x =interaction(factor(Week)), y =Value,colour=(Comment)))+
+  geom_boxplot(aes(colour=(Comment)),position=position_dodge(0),outlier.size = -1,alpha=0.3)+
+  facet_wrap(~DOM*Treatment,ncol=4)+
+  labs(y=expression("BP (ugC L"^-1*"d"^-1*")"),x="")+
+  geom_jitter(position=position_dodge(0))+ my_theme
+
+plot3=df.comm.funct[df.comm.funct$Variable=="BGE",]%>%
+  ggplot(aes(x =interaction(factor(Week)), y =Value,colour=(Comment)))+
+  geom_boxplot(aes(colour=(Comment)),position=position_dodge(0),outlier.size = -1,alpha=0.3)+
+  facet_wrap(~DOM*Treatment,ncol=4)+
+  labs(y=expression("BGE"),x="Disturbance")+geom_jitter(position=position_dodge(0)) + my_theme
+
+plot_grid(plot1,plot2,plot3,ncol=1,align="v",axis="r",labels=LETTERS)
+```
+
+# Resistance index calculation
+## Resistance index definition
+Here we defined the resistance index as the difference between the natural log of the fold change of the disturbance treatment against the control 
+```{r}
+# Option 1 
+resistance1<-function(control,disturbance){
+ abs(log(control)-log(disturbance))
+}
+```
+
+## Estimation of the resistance index
+Here we defined calculation step by step for the resistance index for all the functional parameters.
+```{r}
+
+#Pooling data into a list to perform all the calculation at one by applying a loop for each element (functional measurement) of the list.
+
+#Set up levels as factors
+df.comm.funct$Variable=factor(df.comm.funct$Variable)
+df.comm.funct$Variable=factor(df.comm.funct$Variable,c("Bacterial.production","Community.Respiration","BGE"))
+# Empty list for storing results
+List.ratio=list()
+for (i in 1:3){
+#Splitting the data between before and after the salt pulse disturbance. Here the function aggregate allow us to retrieve the data sorted always in the same way.
+index.level=levels(df.comm.funct$Variable)[i]
+  
+#Before disturbance
+T_bef=aggregate(Value ~ Week+Treatment+DOM+Rep+Comment,
+                data = df.comm.funct[df.comm.funct$Variable==index.level & df.comm.funct$Comment=="before",], FUN= "mean" )
+#After disturbance
+T_aft=aggregate(Value ~ Week+Treatment+DOM+Rep+Comment, 
+                data = df.comm.funct[df.comm.funct$Variable==index.level & df.comm.funct$Comment=="after",], FUN= "mean" )
+
+#Pooling data for calculations
+T_aft$Before=T_bef$Value
+
+#Calculating the response ratio (RR) as F_after/F_before
+T_aft$RR=(T_aft$Value/T_aft$Before)
+
+# Extracting RR for Control and Disturbed treatments
+dist=T_aft[T_aft$Treatment=="D",] #Disturbance treatment
+cont=T_aft[T_aft$Treatment=="C",] #Control
+
+#Calculate the mean of the control RR. To represent the overall variability of the control we used the mean value of the triplicated measurements.
+
+T0<- cont %>%
+  group_by(interaction(DOM,Treatment,Week)) %>% 
+  mutate(mControl_RR = mean(RR)) # Calculate the mean of the controls
+T0<-data.frame(T0)
+
+# State column as factors
+T0$Week=as.factor(T0$Week)
+T0$DOM=as.factor(T0$DOM)
+T0$DOM=factor(T0$DOM,c("LDOM","HDOM"))
+#Calculate the absolute difference between the LRRs (meanControl-Disturbed_replicates)
+T0$res.index=resistance1(T0$mControl_RR,dist$RR)*-1 #option
+T0$Variable=index.level
+List.ratio[[i]]=T0
+}
+```
+
+## Resistance index plots
+```{r fig.dim = c(4, 7), warning=F,message=F,results=F, echo=F}
+#Define general characteristics of the figures
+my_theme<-theme_bw()+
+  theme(text=element_text(size=10, family="ArialMT"))+
+  theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank(), axis.text.x = element_text(size=6),axis.text.y = element_text(size=8))
+
+#Creating plots
+pBP<-List.ratio[[1]]%>%
+  ggplot(aes(x =(Week), y =res.index,group=interaction(Week,DOM)))+
+  geom_boxplot(aes(colour=(DOM)),position=position_dodge(0),outlier.size = -1,alpha=0.3,size=0.5)+
+  labs(y=expression("RI" ["Bacterial production"]),x="")+
+  geom_jitter(aes(colour=DOM),position=position_dodge(0))+scale_colour_grey(name="",start = 0.6, end = 0)+my_theme+theme(legend.position = c(0.8, 0.25),legend.spacing.x = unit(0, 'cm'))
+
+pR<-List.ratio[[2]]%>%
+  ggplot(aes(x =(Week), y =res.index,group=interaction(Week,DOM)))+
+  geom_boxplot(aes(colour=(DOM)),position=position_dodge(0),outlier.size = -1,alpha=0.3,size=0.5)+
+  labs(y=expression("RI" ["Respiration"]),x="")+
+  geom_jitter(aes(colour=DOM),position=position_dodge(0))+scale_colour_grey(name="",start = 0.6, end = 0)+my_theme+theme(legend.position="none")
+
+pBGE<-List.ratio[[3]]%>%
+  ggplot(aes(x =(Week), y =res.index,group=interaction(Week,DOM)))+
+  geom_boxplot(aes(colour=(DOM)),position=position_dodge(0),outlier.size = -1,alpha=0.3,size=0.5)+
+  labs(y=expression("RI" ["BGE"]),x="Time (days)")+
+  geom_jitter(aes(colour=DOM),position=position_dodge(0))+scale_colour_grey(name="",start = 0.6, end = 0)+ my_theme+theme(legend.position="none")
+
+```
+
+## Statistical analysis
+```{r}
+#Setup elements for loop
+List.aov=list() 
+M.stats=matrix(NA,3,8)
+MLM_LDOM=list()
+MLM_HDOM=list()
+# Define variable names
+rownames(M.stats)=c("BP","Respiration","BGE")
+# Define stats names
+colnames(M.stats)=c("F","P-value","F","P-value","Slope","P-value","Slope","P-value")
+
+#Loop for functional data
+for (i in 1:3){
+#Normality
+List.ratio[[i]] %>%
+  group_by(DOM, Week) %>%
+  shapiro_test(res.index)
+
+#Homogeneity of variances
+List.ratio[[i]] %>%
+  group_by(Week) %>%
+  levene_test(res.index~DOM)
+
+#ANOVA
+#Repeated measurement ANOVA (https://stats.idre.ucla.edu/r/seminars/repeated-measures-analysis-with-r/)
+#https://m-clark.github.io/docs/mixedModels/anovamixed.html#introduction
+
+summary(aov(res.index ~DOM*Week + Error(Rep),data=List.ratio[[i]]))
+tmp=aov(res.index ~DOM*Week + Error(Rep),data=List.ratio[[i]])
+
+#Retrieving stats from results
+M.stats[i,1]=as.numeric(unlist(summary(tmp))['Error: Within.F value1'])
+M.stats[i,2]=as.numeric(unlist(summary(tmp))['Error: Within.Pr(>F)1'])
+M.stats[i,3]=as.numeric(unlist(summary(tmp))['Error: Within.F value2'])
+M.stats[i,4]=as.numeric(unlist(summary(tmp))['Error: Within.Pr(>F)2'])
+
+# Mixed linear model for LDOM
+MLM_LDOM[[i]]=lme(res.index ~as.numeric(Week),random=~1|Rep,data=List.ratio[[i]][List.ratio[[i]]$DOM=="LDOM",])
+#Retrieving stats from results
+M.stats[i,5]=as.numeric(unlist(summary(MLM_LDOM[[i]]))$`coefficients.fixed.as.numeric(Week)`) #Get slope
+M.stats[i,6]=as.numeric(unlist(summary(MLM_LDOM[[i]]))$tTable10) #get P-value
+
+# Mixed linear model for HDOM
+MLM_HDOM[[i]]=lme(res.index ~as.numeric(Week),random=~1|Rep,data=List.ratio[[i]][List.ratio[[i]]$DOM=="HDOM",])
+#Retrieving stats from results
+M.stats[i,7]=as.numeric(unlist(summary(MLM_HDOM[[i]]))$`coefficients.fixed.as.numeric(Week)`) #Get slope
+M.stats[i,8]=as.numeric(unlist(summary(MLM_HDOM[[i]]))$tTable10) #get P-value
+}
+```
+
+Table summary statistical analyses
+Statistical results for the repeated measurement ANOVA applied to the resistance index. Results from mixed model to screen  for time trend are also included in the table.
+```{r,message=F}
+kable(M.stats,digits=3,booktabs = TRUE,format = "latex")%>%kable_classic()%>%
+    add_header_above(c("Variable"=1,"DOM" = 2,"Week" = 2,"LDOM" = 2,"HDOM" = 2))%>%
+  add_header_above(c("Function"=1,"RM-ANOVA" = 4, "MLM" = 4))%>%
+  kable_styling(latex_options = c("striped", "condensed","scale_down"),
+position = "center", full_width = FALSE)
+
+```
+
+
+## Exporting Figure 4 ms chemostats
+```{r,include=FALSE}
+# Setup figures
+pBP=pBP+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
+  labs(tag = "A")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+
+pR=pR+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
+  labs(tag = "B")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+
+pBGE=pBGE+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
+  labs(tag = "C")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+```
+
+## Export figure
+```{r,fig.align = 'center', fig.width = 6,fig.height = 8}
+pdf("../figures/Figure4_ResistanceIndex.pdf", width=7,height=9)
+plot_grid(pBP,pR,pBGE, Abundance_plot,legend_plot,
+          ncol = 1,axis="l", rel_heights =c(0.4,0.4,0.4,0.65,0.1), hjust=-4, align="v")
+dev.off()
+
+plot_grid(pBP,pR,pBGE, Abundance_plot,legend_plot,
+          ncol = 1,axis="l", rel_heights =c(0.4,0.4,0.4,0.65,0.1), hjust=-4, align="v")
+
+```
+
