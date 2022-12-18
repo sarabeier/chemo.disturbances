@@ -1,0 +1,336 @@
+---
+title: "Chemo.03.ComunityComposition"
+author: "Angel Rain & Sara Beier"
+date: "7/26/2022"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+  word_document:
+    toc: yes
+---
+```{r, include=F,message=F}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=75),tidy=TRUE)
+```
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H')
+```
+# Load packages and formatting
+## Loading packages
+```{r setup, include=T,message=F,warning=F}
+
+rm(list=ls())
+library(phyloseq) # Phyloseq object
+library(ggplot2)
+library(vegan)
+library(dplyr)
+library(ape)
+library(iCAMP)  # Null model 
+library(cowplot) # Mutiple plot arrangement
+library(egg) # Tag edition
+library(reshape) # Dataframe formation
+library(stringr) # String manipulation
+library(ggstatsplot) 
+library(microViz)
+library(kableExtra) # To nicely print tables
+```
+## Setting colorblind palette
+
+```{r}
+#Colorblind palette
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00","#CC79A7","#808080","#7570B3")
+
+```
+
+## Loading and formating datasets
+In this section the object schema with information about the experimental setup (Sample.ID; Chemostat.ID: chemostats number from 1 to 12; sampling time T: 1:9, DOM: DOM regime; Sal: disturbance regime) is created. 
+Metabarcoding sequence data (16s rRNA gene) were analyzed using the dada2-pipeline (Callahan et al. 2016,  doi: 10.1038/nmeth.3869) using the code in script01_dada2.R and the resulting phyloseq project containing the ASV count table is uploaded.
+
+```{r}
+# Create metadata for experimental setup
+schema<-data.frame(sample.ID=paste0("C10-",rep(1:9,each=12),"-",sprintf("%02d",1:12)),
+                   T=rep(1:9,each=12),
+                   Chem.ID=sprintf("%02d",1:12),
+                   DOM=rep(c("L","H"),each=6), #L: LDOM; H: HDOM
+                   Sal=c("C","D")) #C: control; D: disturbed
+
+tibble(schema)
+```
+
+
+```{r}
+#Loading phyloseq object from #dada2
+ps <- readRDS("../data/dada2.output/chem.ps.rds")
+
+# Loading phylogenetic tree
+chem.tree=read_tree("../data/dada2.output/dada-chem.GTR2")
+phy_tree(ps)<-chem.tree #Adding phylo-tree to the phyloseq object
+
+#Phyloseq object contain abundance table, sample information, taxonomic information and the phylogenetic tree
+ps 
+```
+
+
+# Microbial community dynamic
+## Preprocess phyloseq-object
+```{r}
+#Rarefy by minimum readnumber and transform to relative data
+#set.seed(1) # Set seed for rarefaction
+ps=rarefy_even_depth(ps, min(rowSums(otu_table(ps))),rngseed=1,replace=F,trimOTUs=F)
+
+#Estimating relative abundance
+rOTUdf.rar <- prop.table(otu_table(ps),1)
+
+# New phyloseq-project with rarefied ASV table
+otu_table(ps) <- otu_table(rOTUdf.rar, taxa_are_rows=FALSE) 
+ps 
+
+# Keep ASVs with prevalence equivalent to more 0 reads
+ps<-prune_taxa(taxa_sums(ps)>0,ps) 
+ps
+# Setting up metadata
+# Creating the additional identifier 'sample.names' for downstream analysis
+schema$sample.names=str_replace_all(schema$sample.ID,"-",".")
+head(schema)
+
+# Re-Order ps object by sample ID from schema-object
+new_order <- schema$sample.ID
+ps=ps %>%
+  ps_reorder(new_order) #From microViz
+```
+
+## Setting-up matrix for barplot
+
+```{r, fig.dim = c(3, 3),fig.align="center"}
+# Combine relative count-table with taxonomic information in a new dataframe
+df1<-data.frame(tax_table(ps), t(otu_table(ps))) 
+
+# Aggregate relative counts by taxonomic Order
+df2<-aggregate(. ~ Order,
+               data = df1[,c(4,8:115)], sum, na.rm = TRUE)
+tibble(df2)
+
+order <- df2[,1] #Create a vector with only taxonomic Orders
+rownames(df2) <- df2[,1] # Set taxonomic orders as rownames
+df2<-df2[,-1] #remove column with orders and keep only abundance data
+
+#tcolSums to see representatively of the top orders ()values close to 1 are reached)
+summary(colSums(df2)) 
+
+# Create a new object for the aggregated relative abundance
+agg=df2
+agg<-as.data.frame(agg) #Formatting it as dataframe
+rownames(agg) <- order #add order information as rownames
+agg$Sum.agg<-rowSums(agg) # add an extra column with counts across treatments for all orders
+
+#select the 10 most abundand orders
+agg10<-agg[with(agg, order(-Sum.agg)),][1:10,1:108]
+agg10$order <-rownames(agg10)
+tibble(agg10)
+
+#Check accumulated abundance after pooling by 10 most abundant orders
+summary(colSums(agg10[,1:108])) # All above or around 0.95
+
+#convert dataframe from wide to long format
+agg10.long<-melt(agg10, id.vars='order', variable.name = "treat")
+
+# Combine aggregated data with metadata
+agg10.long=merge(agg10.long,schema,by.x="variable",by.y="sample.names")
+
+# Add experimental time (sampling day) as a new column
+agg10.long$Time=as.data.frame(str_split_fixed(as.vector(agg10.long$variable), "",7))[,5] 
+
+#Formatting columns as factors
+agg10.long$Time=as.factor(agg10.long$Time)
+levels(agg10.long$Time)=c("4","8","15","18","22","29","36","39","41")
+agg10.long$Sal=as.factor(agg10.long$Sal)
+
+#Rename treatments
+levels(agg10.long$Sal)=c("Control","Disturbance")
+agg10.long$DOM=as.factor(agg10.long$DOM)
+
+#Rename DOM level
+levels(agg10.long$DOM)=c("HDOM","LDOM")
+
+#Add replicate identifier
+agg10.long$Rep=rep(c(1,2,3),each=20)
+
+tibble(agg10.long)
+```
+
+## Microbial community relative abundance
+
+Barplots indicate the change of the 10 most abundant order along the chemostat experiment by DOM level (HDOM and LDOM) by disturbance regime (Disturbed and undisturbed Controls).
+Early stages during the succession were dominated by members of Flavobacteriales and Enterobacterales orders at LDOM, as well as Rhodobacterales under the HDOM regime. At intermediate succession stages, Rhodobacterales and Caulobacterales increased in abundance. At the experiment end diverse taxonomic structures were observed and depending on the culture vessel for instance members of the Caulobacterales, Sphingomonadales, Rhodospirillales, or Enterobacterales dominated the community.
+
+```{r, warning=F,message=F,results=F, echo=T}
+# Create an individual plot for LDOM treatment
+
+plot0<-agg10.long[agg10.long$DOM=="LDOM",]%>%
+  ggplot(aes(x = Time, y = value, fill = order)) +
+  geom_bar(stat = "identity",width=1)+scale_fill_manual(values = cbbPalette)+
+  facet_grid(Sal~Rep)+xlab("Sampling day")+ylab("Relative abundance")+theme_bw()+
+  theme(strip.placement.y = "outside",axis.text.x = element_text(size=7),
+        strip.text.y = element_text(angle = 270),
+        strip.background = element_blank())+theme(plot.margin=margin(t =2, r =-12, b =0, l = 0, unit = "pt"))
+plot0<-plot0+theme(legend.position = "none")
+
+# Create an individual plot for HDOM treatment
+plot1<-agg10.long[agg10.long$DOM=="HDOM",]%>%
+  ggplot(aes(x = Time, y = value, fill = order)) +
+  geom_bar(stat = "identity",width=1)+scale_fill_manual(values = cbbPalette)+
+  facet_grid(Sal~Rep)+xlab("Sampling day")+ylab("Relative abundance")+theme_bw()+
+  theme(strip.placement.y = "outside",axis.text.x = element_text(size=7),
+        strip.text.y = element_text(angle = 270),
+        strip.background = element_blank())+theme(plot.margin=margin(t =2, r =0, b =0, l = 0, unit = "pt"))
+```
+
+###  Figure relative abundance
+```{r,echo=F,message=F, fig.dim = c(6,4), fig.cap ="Community structure. Relative abundance of the 10 most abundant orders in the initial communities as well as in the resuscitated communities at LDOM and HDOM levels at each sampling day."}
+plot_grid(plot0,plot1,ncol=1,labels=c("LDOM","HDOM"),align="hv",axis="r")
+```
+
+```{r,echo=F,results=F,message=F}
+# Exporting barplots
+pdf("../figures/FigureS2_Panels_rel_abundance.pdf", width=7,height=5.5)
+plot_grid(plot0,plot1,ncol=1,labels=c("LDOM","HDOM"),align="hv",axis="r")
+dev.off()
+
+```
+# Betadiversity
+## Bray-Curtis and Unifrac ordination
+```{r}
+#Bray-curtis (for relative abundance)
+ord.pcoa.bray<- ordinate(ps, method="PCoA", distance="bray")
+# Setting dataframes with ordination estimations
+df.ord.pcoa.bray= data.frame(pco1=ord.pcoa.bray$vectors[,1],
+                             pco2=ord.pcoa.bray$vectors[,2],
+Treatment=schema$Sal,DOM=schema$DOM,day=as.factor(schema$T),Chem.ID=schema$Chem.ID)
+tibble(df.ord.pcoa.bray)
+#Replace sampling ID by sampling day
+levels(df.ord.pcoa.bray$day)=c("4","8","15","18","22","29","36","39","41")
+
+# Visualize dataframe for Bray-curtis distance ordination
+tibble(df.ord.pcoa.bray)
+
+#Create a label vector for DNA-sampling days
+labels=c("d4","d8","d15","d18","d22","d29","d36","d39","d41")
+```
+
+## Bray-Curtis ordination visualization
+```{r,warning=F, echo=T,message=F, fig.dim = c(7.5,2.9), fig.cap ="Community structure. A) Overview PCoA Bray-Curtis based biplot including all data points. B) PCoAs for individual sampling days; axes of the individual plots are differently scaled as indicated by the grid lines"}
+
+#Figure all data points
+plot.ord.pcoa.bray=ggplot(df.ord.pcoa.bray, aes(x=pco1, y=pco2)) +
+  geom_point(aes(shape=interaction(Treatment,DOM),colour=factor(day)),size=5,alpha=.9)+
+  scale_shape_manual(values=c(1,20, 2, 17),name="Treatments",labels=c("C-HDOM","D-HDOM","C-LDOM","D-LDOM"))+
+  scale_color_manual(values=cbbPalette,name="Sampling day")+
+  theme_bw() +labs(title="")+
+  theme(text=element_text(size=10, family="ArialMT"),panel.grid.minor = element_blank())+
+  scale_x_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+scale_y_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+
+  xlab(paste("PCOA1 [",round(ord.pcoa.bray$values[3][1,]*100,0),"%]"))+
+  ylab(paste("PCOA2 [",round(ord.pcoa.bray$values[3][2,]*100,0),"%]"))+theme(legend.position = "none")
+
+#Panels
+plot.ord.pcoa.bray.b=ggplot(df.ord.pcoa.bray, aes(x=pco1, y=pco2)) +
+  geom_point(aes(shape=interaction(Treatment,DOM),colour=factor(day)),size=3,alpha=.9)+
+  scale_shape_manual(values=c(1,20, 2, 17),name="Treatments",labels=c("C-HDOM","D-HDOM","C-LDOM","D-LDOM"))+
+  scale_color_manual(values=cbbPalette,name="Sampling day")+
+  theme_bw() +labs(title="")+
+  theme_bw() +labs(title="",x="",y="")+
+  theme(text=element_text(size=10, family="ArialMT"),panel.grid.minor = element_blank())+
+  scale_x_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+scale_y_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+
+  facet_wrap(~day,ncol=3,scales="free")+theme(axis.text.x = element_blank(),axis.text.y = element_blank(),
+                                              axis.ticks = element_blank(),legend.key.size = unit(0.8, 'lines'))
+#
+plot.ord.pcoa.bray.b=tag_facet(plot.ord.pcoa.bray.b,open="",close=")",tag_pool = labels,hjust = -.1,size=3)
+plot_grid(plot.ord.pcoa.bray,plot.ord.pcoa.bray.b,rel_widths=c(0.9,1),ncol=2,labels=c("A","B"))
+```
+
+## Unifrac ordination visualization
+```{r}
+#Unifrac (Weighted=T for considering relative abundances)
+ord.pcoa.unif <-ordinate(ps, "PCoA", "unifrac", weighted=T)
+
+#Setting dataframes with ordination estimations
+df.ord.pcoa.unif= data.frame(pco1=ord.pcoa.unif$vectors[,1],
+                             pco2=ord.pcoa.unif$vectors[,2],                             Treatment=schema$Sal,DOM=schema$DOM,day=as.factor(schema$T),Chem.ID=schema$Chem.ID)
+tibble(df.ord.pcoa.unif)
+
+#Replace sampling ID by sampling day
+levels(df.ord.pcoa.unif$day)=c("4","8","15","18","22","29","36","39","41")
+
+# Visualize dataframe for Unifrac distance ordination
+tibble(df.ord.pcoa.unif)
+```
+
+```{r , warning=F, echo=T,message=F, fig.dim = c(7.5,2.9), fig.cap ="Community structure. A) Overview PCoA weighted Unifrac based biplot including all data points. B) PCoAs for individual sampling days; axes of the individual plots are differently scaled as indicated by the grid lines"}
+
+#Figure all data points
+plot.ord.pcoa.unif=ggplot(df.ord.pcoa.unif, aes(x=pco1, y=pco2)) +
+  geom_point(aes(shape=interaction(Treatment,DOM),colour=factor(day)),size=5,alpha=.9)+
+  scale_shape_manual(values=c(1,20, 2, 17),name="Treatments",labels=c("C-HDOM","D-HDOM","C-LDOM","D-LDOM"))+
+  scale_color_manual(values=cbbPalette,name="Sampling day")+
+theme_bw() +labs(title="")+
+  theme(text=element_text(size=10, family="ArialMT"),panel.grid.minor = element_blank())+
+  scale_x_continuous(breaks = seq(-0.50, 0.5, 0.125),expand =c(0.02,0.02))+scale_y_continuous(breaks = seq(-0.50, 0.5, 0.125),expand =c(0.02,0.02))+
+  xlab(paste("PCOA1 [",round(ord.pcoa.unif$values[3][1,]*100,0),"%]"))+
+  ylab(paste("PCOA2 [",round(ord.pcoa.unif$values[3][2,]*100,0),"%]"))+theme(legend.position = "none")
+
+#Panels
+plot.ord.pcoa.unif.b=ggplot(df.ord.pcoa.unif, aes(x=pco1, y=pco2)) +
+  geom_point(aes(shape=interaction(Treatment,DOM),colour=factor(day)),size=3,alpha=.9)+
+  scale_shape_manual(values=c(1,20, 2, 17),name="Treatments",labels=c("C-HDOM","D-HDOM","C-LDOM","D-LDOM"))+
+  scale_color_manual(values=cbbPalette,name="Sampling day")+
+  theme_bw() +labs(title="")+
+  theme_bw() +labs(title="",x="",y="")+
+  theme(text=element_text(size=10, family="ArialMT"),panel.grid.minor = element_blank())+
+  scale_x_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+scale_y_continuous(breaks = seq(-0.5, 0.5, 0.125),expand =c(0.02,0.02))+
+  facet_wrap(~day,ncol=3,scales="free")+theme(axis.text.x = element_blank(),axis.text.y = element_blank(),
+                                              axis.ticks = element_blank(),legend.key.size = unit(0.8, 'lines'))
+
+plot.ord.pcoa.unif.b=tag_facet(plot.ord.pcoa.unif.b,open="",close=")",tag_pool = labels,hjust = -.1,size=3)
+plot_grid(plot.ord.pcoa.unif,plot.ord.pcoa.unif.b,rel_widths=c(0.9,1),ncol=2,labels=c("A","B"))
+
+```
+
+
+```{r,echo=F,results=F,message=F}
+
+pdf("../figures/Figure2_PCoA_bray.pdf", width=7,height=3.5)
+plot_grid(plot.ord.pcoa.bray,NULL,plot.ord.pcoa.bray.b,rel_widths=c(0.55,-0.01,0.6),ncol=3,
+          labels=c("A","","B"))
+dev.off()
+
+pdf("../figures/FigureS4_PCoA_wunif.pdf", width=7,height=3.5)
+plot_grid(plot.ord.pcoa.unif,NULL,plot.ord.pcoa.unif.b,rel_widths=c(0.55,-0.01,0.6),ncol=3,
+          labels=c("A","","B"))
+dev.off()
+
+```
+
+# Statistical analysis
+## Permanova 
+We performed a Permutational Multivariate Analysis of Variance (Permanova) usgin the difference distance matrix estimated (Bray-curtis and Unifrac distances). Factor considered for the analysis were: 1) DOM level availability, 2) Disturbance treatment (as "Sal" treatment) and 3) Time.
+
+```{r cache=TRUE}
+# Bray Curtis distance
+dist.bray<-phyloseq::distance(ps, method="bray")
+
+# Unifrac distance
+dist.wunif <- phyloseq::distance(ps, method="wunifrac")
+
+# Permanova all factors: 1) DOM level availability, 2) Disturbance treatment (Sal) and 3) Time.
+
+# Bray Curtis distance 
+set.seed(1)
+permanova.bray <- adonis2(dist.bray ~ DOM*Sal*T,data=schema,permutations = 1000)
+permanova.bray
+
+# Unifrac distance
+set.seed(1)
+permanova.wunifrac <- adonis2(dist.wunif ~ DOM*Sal*T,data=schema,permutations = 1000)
+permanova.wunifrac
+```
