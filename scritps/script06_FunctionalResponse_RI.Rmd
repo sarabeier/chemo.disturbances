@@ -36,7 +36,7 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2"
 ## Abundance and salinity
 
 ```{r,fig.align = 'center', fig.width = 6,fig.height = 3}
-Dat=data.frame(read_xls("../data/comm.rates/MicrobialAbundance.xls",sheet="Chemo summary"))
+Dat=data.frame(read_xlsx("../data/comm.rates/Supplementary_Tables.xlsx",sheet="Table S6"))
 Dat=Dat[Dat$Time<42,] #Only keep the samples until one day 41 for figure
 DatS=Dat #Dataframe only for Salinity figure
 Dat=Dat[complete.cases(Dat),] #Removing unused columns
@@ -104,7 +104,7 @@ Abundance_plot=Abundance_plot+theme(legend.position="none")
 # Loading datasets Community functioning
 Dataset includes microbial community respiration and bacterial production
 ```{r}
-df.comm.funct<-data.frame(read_csv("../data/comm.rates/Functional.response.csv"))
+df.comm.funct<-data.frame(read_xlsx("../data/comm.rates/Supplementary_Tables.xlsx",sheet="Table S7"))
 tibble(df.comm.funct)
 ```
 
