@@ -168,7 +168,7 @@ pic.TFr.default <- read.table("../data/picrust2/trait.predicted/pic.chemo10.TF_p
 #load genome size predicted from PICRUSt2 default settings
 pic.gs.default <- read.table("../data/picrust2/trait.predicted/pic.chemo10.genomesize_predicted.txt", header=T)
 
-#Re-transform predicted genomic traits
+#Re-transforming predicted genomic traits to the originial units
 
 ## Generation time
 n <- pic.d.gRodon.default$d.gRodon
@@ -182,9 +182,9 @@ pic.TFr.default$TF_perc <- (n / 1000 * (pic.traits$var.max[5]-pic.traits$var.min
 n <- pic.gs.default$genome.size
 pic.gs.default$genome.size <- ((n / 1000 * (pic.traits$var.max[1]-pic.traits$var.min[1])) + pic.traits$var.min[1])/1000000 #divide by MiO to get results in Mbp
 
-Exporting re-transformed traits
-write.table(pic.d.gRodon.default, '../data/picrust2/trait.predicted/pic.d.gRodon.scaled.txt', row.names=FALSE, sep ='\t',quote=FALSE)
-write.table(pic.TFr.default, '../data/picrust2/trait.predicted/pic.TF_perc.scaled.txt', row.names=FALSE, sep ='\t',quote=FALSE)
-write.table(pic.gs.default, '../data/picrust2/trait.predicted/pic.genome.size.scaled.txt', row.names=FALSE, sep ='\t',quote=FALSE)
+#Exporting re-transformed traits
+write.table(pic.d.gRodon.default, '../data/picrust2/trait.predicted/pic.d.gRodon.retransformed.txt', row.names=FALSE, sep ='\t',quote=FALSE)
+write.table(pic.TFr.default, '../data/picrust2/trait.predicted/pic.TF_perc.retransformed.txt', row.names=FALSE, sep ='\t',quote=FALSE)
+write.table(pic.gs.default, '../data/picrust2/trait.predicted/pic.genome.size.retransformed.txt', row.names=FALSE, sep ='\t',quote=FALSE)
 ```
 
