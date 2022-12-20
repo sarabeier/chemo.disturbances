@@ -21,7 +21,6 @@ opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
 rm(list=ls())
 library(phyloseq)
 library(reshape2)
-#library(dplyr)
 library(ggplot2)
 library(vegan)
 library(rstatix) #Homogeneity of variance test
