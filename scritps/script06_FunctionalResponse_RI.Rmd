@@ -20,14 +20,10 @@ rm(list=ls())
 library(readxl) # read excel files
 library(dplyr) 
 library(ggplot2) #Plots
-#library(Hmisc) #
 library(tidyverse)
-#library(ggpubr)
-library(rstatix)
-#library(emmeans)
+library(rstatix) # HOV test
 library(cowplot) #Arrange plots
-library(egg) #Tag in figures
-library(olsrr) #Normality test (kolmogorov-smirnov)
+library(olsrr) #Normality test (Kolmogorov-Smirnov)
 library(kableExtra) #Export regular tables
 library(nlme) #Mixed linear models
 library(lmerTest) #P values mixed linear models
@@ -53,13 +49,13 @@ Dat$id=as.factor(Dat$id)
 # DNA sampling frequency plot
 pDNA=ggplot()+#
   geom_segment(aes(x=c(4,8,15,18,22,29,36,39,41),y=rep(2,9), xend = c(4,8,15,18,22,29,36,39,41), yend = rep(0,9)),
-               arrow = arrow(length = unit(0.2, "cm")),size=.5)+labs(y="DNA Sampling",x="")+
+               arrow = arrow(length = unit(0.2, "cm")),size=.5)+labs(y="DNA",x="")+
   annotate("text", x=c(4,8,15,18,22,29,36,39,41)-1, y = rep(1.5,9),
-           label=c("T1","T2","T3","T4","T5","T6","T7","T8","T9"),size=3)+
+           label=c("T1","T2","T3","T4","T5","T6","T7","T8","T9"),size=4)+
   scale_x_continuous(breaks = c(1:41),expand=c(0.01,0.01),limits = c(1,41))+
   theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major =element_blank(),
                    axis.text.x = element_blank(),axis.text.y =element_blank())+
-  theme(text=element_text(size=10, family="ArialMT"))+
+  theme(text=element_text(size=14, family="ArialMT"))+
   labs(tag = "")+theme(axis.ticks.y=element_blank(),axis.ticks.x=element_blank(),panel.border = element_blank())+
   theme(plot.margin=margin(t = -5, r = 5, b = -10, l = 0, unit = "pt"))+
   theme(axis.title.y = element_text(angle = 0, vjust = 0.5))
@@ -71,10 +67,10 @@ Salinity_plot=DatS%>%
   stat_summary(aes(Time,Salinity,colour=Treatment,linetype=DOM),fun= mean,geom = "line")+
   geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
   scale_color_manual(values=cbbPalette,name="")+
-  xlab("")+ylab("Salinity")+ylim(35,60)+
+  xlab("Time (days)")+ylab("Salinity")+ylim(35,60)+
   labs(tag = "")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
   theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank(),legend.position = "none",
-                   axis.text.x = element_text(size=6),axis.text.y = element_text(size=8))+
+                   axis.text.x = element_text(size=11),axis.text.y = element_text(size=10),axis.title.y = element_text(size=14))+
   theme(text=element_text(family="ArialMT"))+
   theme(plot.margin=margin(t = -15, r = 5, b = 0, l = 0, unit = "pt"))+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 
@@ -83,7 +79,7 @@ plot_grid(pDNA,Salinity_plot,
           ncol = 1,axis="l", rel_heights =c(0.1,0.5), hjust=-4, align="v")
 dev.off()
 plot_grid(pDNA,Salinity_plot,
-          ncol = 1,axis="l", rel_heights =c(0.1,0.5), hjust=-4, align="v")
+          ncol = 1,axis="l", rel_heights =c(0.1,0.55), hjust=-4, align="v")
 
 ```
 ## Bacterial abundance time series
@@ -94,7 +90,7 @@ Abundance_plot=Dat%>%
   geom_point(aes(colour=Treatment,shape=DOM),size=1)+
   scale_colour_manual(values=cbbPalette,name="Disturbance")+
   scale_shape_manual(values=c(21, 4),name="DOM level",labels=c("HDOM","LDOM"))+
-  labs(tag = "D")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
+  labs(tag = "")+scale_x_continuous(breaks = seq(1,41,2),expand=c(0.01,0.01))+
   xlab("Time (days)")+ylab(expression("BA (x10"^6*"cell mL"^-1*")"))+
   geom_smooth(aes(colour=Treatment),method="loess",se=F,span=0.3)+
   geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
@@ -108,7 +104,7 @@ Abundance_plot=Abundance_plot+theme(legend.position="none")
 # Loading datasets Community functioning
 Dataset includes microbial community respiration and bacterial production
 ```{r}
-df.comm.funct<-data.frame(read_csv("../data/comm.rates/functional.response.csv"))
+df.comm.funct<-data.frame(read_csv("../data/comm.rates/Functional.response.csv"))
 tibble(df.comm.funct)
 ```
 
@@ -319,21 +315,21 @@ position = "center", full_width = FALSE)
 ## Exporting Figure 4 ms chemostats
 ```{r,include=FALSE}
 # Setup figures
-pBP=pBP+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
-  labs(tag = "A")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+pBP=pBP+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
+  labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 
-pR=pR+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
-  labs(tag = "B")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+pR=pR+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
+  labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 
-pBGE=pBGE+theme(plot.margin=margin(t = -5, r = 5, b = -22, l = 0, unit = "pt"))+
-  labs(tag = "C")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+pBGE=pBGE+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
+  labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 ```
 
 ## Export figure
 ```{r,fig.align = 'center', fig.width = 6,fig.height = 8}
 pdf("../figures/Figure4_ResistanceIndex.pdf", width=7,height=9)
 plot_grid(pBP,pR,pBGE, Abundance_plot,legend_plot,
-          ncol = 1,axis="l", rel_heights =c(0.4,0.4,0.4,0.65,0.1), hjust=-4, align="v")
+          ncol = 1,axis="l", rel_heights =c(0.4,0.4,0.4,0.65,0.1), hjust=0, align="v",labels=c("A","B","C","D"))
 dev.off()
 
 plot_grid(pBP,pR,pBGE, Abundance_plot,legend_plot,
