@@ -70,15 +70,15 @@ ps
 pic.16s.custom <- read.table("../data/picrust2/trait.predicted/pic.chemo10.16S_predicted_custom_tree.txt", header=T) 
 tibble(pic.16s.custom)
 #load generation time predicted from PICRUST2 default tree and database
-pic.d.gRodon.default <- read.table("../data/picrust2/trait.predicted/pic.d.gRodon.scaled.txt", header=T)  
+pic.d.gRodon.default <- read.table("../data/picrust2/trait.predicted/pic.d.gRodon.retransformed.txt", header=T)  
 tibble(pic.d.gRodon.default)
 
 #Resistance-related genes
 #load %TF predicted from PICRUSt2 default tree and database
-pic.TFr.default <- read.table("../data/picrust2/trait.predicted/pic.TF_perc.scaled.txt", header=T)
+pic.TFr.default <- read.table("../data/picrust2/trait.predicted/pic.TF_perc.retransformed.txt", header=T)
 tibble(pic.TFr.default)
 #load genome size predicted from PICRUSt2 default tree and database
-pic.gs.default <- read.table("../data/picrust2/trait.predicted/pic.genome.size.scaled.txt", header=T)
+pic.gs.default <- read.table("../data/picrust2/trait.predicted/pic.genome.size.retransformed.txt", header=T)
 tibble(pic.gs.default)
 
 ```
