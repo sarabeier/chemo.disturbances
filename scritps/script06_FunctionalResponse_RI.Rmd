@@ -96,7 +96,7 @@ Abundance_plot=Dat%>%
   geom_vline(xintercept=c(2.5,9.5,16.5,23.5,30.5,37.5),linetype="dotted",colour="grey")+
   theme_bw()+theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank(),legend.position = "bottom", legend.box="vertical",legend.margin=margin(),legend.spacing.y = unit(0, 'cm'), axis.text.x = element_text(size=10),axis.text.y = element_text(size=8))+
   theme(text=element_text(family="ArialMT"))+
-  theme(plot.margin=margin(t =0, r = 5, b = 2, l = 0, unit = "pt"))+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+  theme(plot.margin=margin(t =-6, r = 5, b = 2, l = 0, unit = "pt"))+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 legend_plot=get_legend(Abundance_plot)
 Abundance_plot=Abundance_plot+theme(legend.position="none")
 ```
@@ -315,13 +315,14 @@ position = "center", full_width = FALSE)
 ## Exporting Figure 4 ms chemostats
 ```{r,include=FALSE}
 # Setup figures
-pBP=pBP+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
+pBP=pBP+theme(plot.margin=margin(t = -6, r = 5, b = -22, l = 0, unit = "pt"))+
   labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 
-pR=pR+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
-  labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
+pR=pR+theme(plot.margin=margin(t = -6, r = 5, b = -22, l = 0, unit = "pt"))+
+  labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))+
+  scale_y_continuous(breaks=c(-7.5,-5,-2.5,0))
 
-pBGE=pBGE+theme(plot.margin=margin(t = -6, r = 5, b = -21.3, l = 0, unit = "pt"))+
+pBGE=pBGE+theme(plot.margin=margin(t = -6, r = 5, b = -22, l = 0, unit = "pt"))+
   labs(tag = "")+theme(plot.tag=element_text(size=14,face="bold",vjust=-4))
 ```
 
