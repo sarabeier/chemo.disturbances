@@ -24,7 +24,7 @@ library(reshape2)
 library(dplyr)
 library(ggplot2)
 library(vegan)
-library(rstatix) #Homogenety of variance test
+library(rstatix) #Homogeneity of variance test
 library(olsrr) # test_normality
 library(egg) # Tag figures
 library(rstatix) #Tibble function
