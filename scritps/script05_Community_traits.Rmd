@@ -21,7 +21,7 @@ opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
 rm(list=ls())
 library(phyloseq)
 library(reshape2)
-library(dplyr)
+#library(dplyr)
 library(ggplot2)
 library(vegan)
 library(rstatix) #Homogeneity of variance test
@@ -31,7 +31,6 @@ library(rstatix) #Tibble function
 library(microViz) #TO use re_order function
 library(kableExtra) #Table format
 
-#SARA: please check, keep only libraries that are needed in the script
 #######################################
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ```
